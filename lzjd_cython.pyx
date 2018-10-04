@@ -1,5 +1,6 @@
 cimport cython
 from cpython cimport array
+from libc.stdlib cimport qsort
 import array
 
 # Helper functions we need
@@ -80,7 +81,48 @@ def lzjd_f(char* input_bytes, unsigned int hash_size):
             cur_length = 0
             data[0] = data[1] = data[2] = data[3] = 0
             state = 0
-            
 
+    result = nth_element(list(s1), len(s1), 5)
+
+    if len(s1) > hash_size:
+        #nth_element(s1.begin(), s1.begin()+hash_size, s1.end())
+        #s1.resize(hash_size)
+        #sort(s1.begin(), s1.end())
+    else:
+        pass
+        #sort(s1.begin(), s1.end())
+        #s1.resize(hash_size)
     
     return s1
+
+#Implementation of nth_element from c++ in Cython
+#Selects k smallest elements in a set
+#arr: List of elements
+#k: Number of smallest values
+#n: Size of the array
+#Based on:
+#https://www.geeksforgeeks.org/k-smallest-elements-order-using-o1-extra-space/
+def nth_element(arr, int n, int k):
+
+    cdef int i = k
+    while i < n:
+        max_var = arr[k-1]
+        pos = k-1
+        
+        j = k-2
+        while j >= 0:
+            if arr[j] > max_var:
+                max_var = arr[j]
+                pos = j
+            j = j - 1
+        
+        if max_var > arr[i]:
+            j = pos
+            while j < k-1:
+                arr[j] = arr[j+1]
+                j = j + 1
+            arr[k-1] = arr[i]
+        i = i + 1
+    return arr[:k]
+
+    
