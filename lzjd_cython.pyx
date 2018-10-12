@@ -1,7 +1,11 @@
 cimport cython
 from cpython cimport array
-from libc.stdlib cimport qsort
 import array
+from libc.stdlib cimport malloc, free
+cdef extern from "stdlib.h":
+    ctypedef void const_void "const void"
+    void qsort(void *base, int nmemb, int size,
+            int(*compar)(const_void *, const_void *)) nogil
 
 # Helper functions we need
 
@@ -82,27 +86,50 @@ def lzjd_f(char* input_bytes, unsigned int hash_size):
             data[0] = data[1] = data[2] = data[3] = 0
             state = 0
 
-    result = nth_element(list(s1), len(s1), 5)
-
+    #Might be inefficient to convert to list then to array
+    arr = list(s1)
+    cdef int* values
+    test_size = 0
     if len(s1) > hash_size:
-        #nth_element(s1.begin(), s1.begin()+hash_size, s1.end())
-        #s1.resize(hash_size)
-        #sort(s1.begin(), s1.end())
-    else:
+        bottom_k = nth_element(arr, len(s1), hash_size)
+        values = toArray(bottom_k, len(bottom_k))
+        sort(values, len(bottom_k))
+        test_size = len(bottom_k)
         pass
-        #sort(s1.begin(), s1.end())
-        #s1.resize(hash_size)
+    else:
+        values = toArray(arr, len(s1))
+        sort(values, len(s1))
+        test_size = len(s1)
+        pass
+        
+    #free(values)
     
+    #Can the return type be int*?
+    #return values
     return s1
-
+    
+#Creates a cython array by copying each element of a python list into a newly malloc'ed array
+cdef signed int* toArray(fromList, size):
+    cdef signed int* hashes
+    
+    hashes = <signed int *>malloc(size * cython.sizeof(int))
+    if hashes is NULL:
+        raise MemoryError()
+    for i in xrange(size):
+        hashes[i] = fromList[i]
+        
+    return hashes
+    
+#Wrapper function to call qsort
+cdef void sort(signed int* y, ssize_t l):
+    qsort(y, l, cython.sizeof(int), compare)
+    
 #Implementation of nth_element from c++ in Cython
 #Selects k smallest elements in a set
-#arr: List of elements
+#arr: Array of elements
 #k: Number of smallest values
 #n: Size of the array
-#Based on:
-#https://www.geeksforgeeks.org/k-smallest-elements-order-using-o1-extra-space/
-def nth_element(arr, int n, int k):
+cdef nth_element(arr, n, int k):
 
     cdef int i = k
     while i < n:
@@ -124,5 +151,9 @@ def nth_element(arr, int n, int k):
             arr[k-1] = arr[i]
         i = i + 1
     return arr[:k]
-
+    
+cdef int compare(const_void *va, const_void *vb):
+    cdef int a = (<signed int *>va)[0]
+    cdef int b = (<signed int *>vb)[0]
+    return (a > b) - (a < b)
     
