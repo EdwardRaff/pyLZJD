@@ -2,6 +2,7 @@ cimport cython
 from cpython cimport array
 import array
 from libc.stdlib cimport malloc, free
+import numpy as np
 cdef extern from "stdlib.h":
     ctypedef void const_void "const void"
     void qsort(void *base, int nmemb, int size,
@@ -86,6 +87,7 @@ def lzjd_f(char* input_bytes, unsigned int hash_size):
             data[0] = data[1] = data[2] = data[3] = 0
             state = 0
 
+    setLength = len(s1)
     #Might be inefficient to convert to list then to array
     arr = list(s1)
     cdef int* values
@@ -95,18 +97,22 @@ def lzjd_f(char* input_bytes, unsigned int hash_size):
         values = toArray(bottom_k, len(bottom_k))
         sort(values, len(bottom_k))
         test_size = len(bottom_k)
-        pass
     else:
         values = toArray(arr, len(s1))
         sort(values, len(s1))
         test_size = len(s1)
-        pass
+    
+    #O(n) convert to numpy array
+    #TODO: Use arrays more efficiently here.
+    numpy_arr = np.zeros(shape=(test_size),dtype=np.int32)
+    for i in range(test_size):
+        numpy_arr[i] = values[i]
         
-    #free(values)
+    free(values)
     
     #Can the return type be int*?
     #return values
-    return s1
+    return numpy_arr, setLength
     
 #Creates a cython array by copying each element of a python list into a newly malloc'ed array
 cdef signed int* toArray(fromList, size):
