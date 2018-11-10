@@ -2,8 +2,21 @@ import pyximport; pyximport.install()
 import lzjd_cython
 import numpy as np
 import os
+from multiprocessing import Pool 
 
-def hash(b, hash_size=1024):
+
+def hash(b, hash_size=1024, processes=-1):
+    if isinstance(b, list): #Assume this is a list of things to hash. 
+        if processes < 0:
+            processes = None
+        elif processes <= 1: # Assume 0 or 1 means just go single threaded
+            return [z for z in map(hash, b)]
+        #Else, go multi threaded!
+        pool = Pool(processes)
+        to_ret = [z for z in pool.map(hash, b)]
+        pool.close()
+        return to_ret
+    #Not a list, assume we are processing a single file
     if os.path.exists(b): #Was b a path? If it was an valid, lets hash that file!
         #TODO: Add new cython code that reads in a file in chunks and interleaves the digest creation
         in_file = open(b, "rb") # opening for [r]eading as [b]inary

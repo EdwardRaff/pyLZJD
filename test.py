@@ -16,3 +16,7 @@ f_a = "lzjd.py"
 f_b = "lzjd_cython.pyx"
 
 print(sim(hash(f_a), hash(f_b)))
+
+
+hashes = hash([f_a, f_b]*1000, processes=-1)
+print(sim(hashes[0], hashes[1]))
