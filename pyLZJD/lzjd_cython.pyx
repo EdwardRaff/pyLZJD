@@ -69,7 +69,8 @@ cdef int MurmurHash_PushByte(char b, unsigned int* cur_len, int* _h1, char* data
 
     return h1_as_if_done;
     
-def lzjd_f(char* input_bytes, unsigned int hash_size):
+@cython.boundscheck(False)
+def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
     cdef set s1
     s1 = set()
     
@@ -77,16 +78,19 @@ def lzjd_f(char* input_bytes, unsigned int hash_size):
     cdef char data[4]
     cdef int state = 0
     cdef int hash = 0
-    
+    cdef count = 0
+    #Defined b as a char to avoid it becoming a python big-num and causing errors 
+    cdef unsigned char b
+    cdef unsigned int i
+
     for b in input_bytes:
-        hash = MurmurHash_PushByte(b, &cur_length, &state, data)
+        hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
         if not hash in s1:
             s1.add(hash)
             #Reset state
             cur_length = 0
             data[0] = data[1] = data[2] = data[3] = 0
             state = 0
-
     setLength = len(s1)
     #Might be inefficient to convert to list then to array
     arr = list(s1)

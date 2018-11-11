@@ -1,5 +1,5 @@
 import pyximport; pyximport.install()
-import lzjd_cython
+from . import lzjd_cython
 import numpy as np
 import os
 from multiprocessing import Pool 
