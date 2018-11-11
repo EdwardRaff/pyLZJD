@@ -142,6 +142,8 @@ cdef void sort(signed int* y, ssize_t l):
 cdef nth_element(arr, n, int k):
 
     cdef int i = k
+    cdef int j
+    cdef int pos
     while i < n:
         max_var = arr[k-1]
         pos = k-1
