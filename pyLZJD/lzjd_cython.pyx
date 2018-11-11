@@ -139,11 +139,12 @@ cdef void sort(signed int* y, ssize_t l):
 #arr: Array of elements
 #k: Number of smallest values
 #n: Size of the array
-cdef nth_element(arr, n, int k):
+cdef nth_element(arr, int n, int k):
 
     cdef int i = k
     cdef int j
     cdef int pos
+    cdef int max_var
     while i < n:
         max_var = arr[k-1]
         pos = k-1
