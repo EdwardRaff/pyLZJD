@@ -84,7 +84,6 @@ def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
     cdef unsigned int i
     cdef signed int v
 
-    print("Working on ", len(input_bytes))
     for b in input_bytes:
         hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
         if not hash in s1:
