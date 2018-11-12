@@ -1,7 +1,7 @@
 cimport cython
 from cpython cimport array
 import array
-from libc.stdlib cimport malloc, free
+from libc.stdlib cimport malloc, realloc, free
 import numpy as np
 cdef extern from "stdlib.h":
     ctypedef void const_void "const void"
@@ -77,11 +77,12 @@ def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
     cdef unsigned int cur_length = 0
     cdef char data[4]
     cdef int state = 0
-    cdef int hash = 0
-    cdef count = 0
+    cdef int hash 
+    cdef unsigned int pos = 0
     #Defined b as a char to avoid it becoming a python big-num and causing errors 
     cdef unsigned char b
     cdef unsigned int i
+    cdef signed int v
 
     for b in input_bytes:
         hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
@@ -92,78 +93,80 @@ def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
             data[0] = data[1] = data[2] = data[3] = 0
             state = 0
     setLength = len(s1)
-    #Might be inefficient to convert to list then to array
-    arr = list(s1)
-    cdef int* values
-    test_size = 0
-    if len(s1) > hash_size:
-        bottom_k = nth_element(arr, len(s1), hash_size)
-        values = toArray(bottom_k, len(bottom_k))
-        sort(values, len(bottom_k))
-        test_size = len(bottom_k)
+    
+    #Copy set into a new dense array
+    cdef signed int* arr = <signed int *>malloc(setLength * cython.sizeof(int))
+    for v in s1:
+        arr[pos] = v
+        pos = pos + 1
+    
+        
+    cdef unsigned int test_size
+    if setLength > hash_size:
+        #move the smallest k values to front
+        q_select(arr, 0, setLength, hash_size)
+        test_size = hash_size
+        #We don't need anything past the min k, so realloc to free excess memory
+        arr =  <signed int *>realloc(arr, hash_size * cython.sizeof(int))
     else:
-        values = toArray(arr, len(s1))
-        sort(values, len(s1))
-        test_size = len(s1)
+        test_size = setLength
+    sort(arr, test_size)
     
     #O(n) convert to numpy array
     #TODO: Use arrays more efficiently here.
     numpy_arr = np.zeros(shape=(test_size),dtype=np.int32)
     for i in range(test_size):
-        numpy_arr[i] = values[i]
+        numpy_arr[i] = arr[i]
         
-    free(values)
+    free(arr)
     
     #Can the return type be int*?
-    #return values
     return numpy_arr, setLength
-    
-#Creates a cython array by copying each element of a python list into a newly malloc'ed array
-cdef signed int* toArray(fromList, size):
-    cdef signed int* hashes
-    
-    hashes = <signed int *>malloc(size * cython.sizeof(int))
-    if hashes is NULL:
-        raise MemoryError()
-    for i in xrange(size):
-        hashes[i] = fromList[i]
-        
-    return hashes
     
 #Wrapper function to call qsort
 cdef void sort(signed int* y, ssize_t l):
     qsort(y, l, cython.sizeof(int), compare)
     
-#Implementation of nth_element from c++ in Cython
-#Selects k smallest elements in a set
-#arr: Array of elements
-#k: Number of smallest values
-#n: Size of the array
-cdef nth_element(arr, int n, int k):
+#Implementation of quick select algorithm
+#arr: array of elements
+#left: the left most position of the array (inclusive)
+#right: the right most position of the array (exclusive)
+#k: the rank to get up to 
+#NOTE: Normally q_select this naive wouldn't be great. Be we know for fact that we will have random looking values and random distribution b/c all entries are results from hashing. So this should be fine!
+cdef q_select(int* arr, int left, int right, int k):
+    pivotIndex = q_partition(arr, left, right)
+    # The pivot is in its final sorted position
+    if k == pivotIndex:
+        return arr[k]
+    elif k < pivotIndex:
+        q_select(arr, left, pivotIndex - 1, k)
+    else:
+        q_select(arr, pivotIndex + 1, right, k)
 
-    cdef int i = k
-    cdef int j
-    cdef int pos
-    cdef int max_var
-    while i < n:
-        max_var = arr[k-1]
-        pos = k-1
-        
-        j = k-2
-        while j >= 0:
-            if arr[j] > max_var:
-                max_var = arr[j]
-                pos = j
-            j = j - 1
-        
-        if max_var > arr[i]:
-            j = pos
-            while j < k-1:
-                arr[j] = arr[j+1]
-                j = j + 1
-            arr[k-1] = arr[i]
+#returns position of the pivot
+cdef int q_partition(int* arr, int left, int right):
+    cdef int pivot = arr[left]
+    cdef int temp 
+    cdef int i = left - 1
+    cdef int j = right + 1
+    while True:
+        #Find leftmost element greater than or equal to pivot 
         i = i + 1
-    return arr[:k]
+        while arr[i] < pivot:
+            i = i + 1
+        #Find rightmost element smaller than  or equal to pivot 
+        j = j - 1
+        while arr[j] > pivot:
+            j = j -1
+   
+        if i >= j:
+            return j
+   
+        temp = arr[j]
+        arr[j] = arr[i]
+        arr[i] = temp
+        
+
     
 cdef int compare(const_void *va, const_void *vb):
     cdef int a = (<signed int *>va)[0]
