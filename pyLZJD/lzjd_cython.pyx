@@ -84,6 +84,7 @@ def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
     cdef unsigned int i
     cdef signed int v
 
+    print("Working on ", len(input_bytes))
     for b in input_bytes:
         hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
         if not hash in s1:
@@ -107,7 +108,7 @@ def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
         q_select(arr, 0, setLength, hash_size)
         test_size = hash_size
         #We don't need anything past the min k, so realloc to free excess memory
-        arr =  <signed int *>realloc(arr, hash_size * cython.sizeof(int))
+        #arr =  <signed int *>realloc(arr, hash_size * cython.sizeof(int))
     else:
         test_size = setLength
     sort(arr, test_size)
@@ -119,6 +120,7 @@ def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
         numpy_arr[i] = arr[i]
         
     free(arr)
+    arr = NULL
     
     #Can the return type be int*?
     return numpy_arr, setLength
@@ -136,19 +138,22 @@ cdef void sort(signed int* y, ssize_t l):
 cdef q_select(int* arr, int left, int right, int k):
     pivotIndex = q_partition(arr, left, right)
     # The pivot is in its final sorted position
-    if k == pivotIndex:
-        return arr[k]
+    if k == pivotIndex or (right - left) <= 1:
+        return
     elif k < pivotIndex:
-        q_select(arr, left, pivotIndex - 1, k)
+        q_select(arr, left, pivotIndex, k)
     else:
         q_select(arr, pivotIndex + 1, right, k)
 
+#arr: array of elements
+#left: the left most position of the array (inclusive)
+#right: the right most position of the array (exclusive)
 #returns position of the pivot
 cdef int q_partition(int* arr, int left, int right):
     cdef int pivot = arr[left]
     cdef int temp 
     cdef int i = left - 1
-    cdef int j = right + 1
+    cdef int j = right
     while True:
         #Find leftmost element greater than or equal to pivot 
         i = i + 1
@@ -157,7 +162,7 @@ cdef int q_partition(int* arr, int left, int right):
         #Find rightmost element smaller than  or equal to pivot 
         j = j - 1
         while arr[j] > pivot:
-            j = j -1
+            j = j - 1
    
         if i >= j:
             return j
