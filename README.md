@@ -14,7 +14,7 @@ We currently recommend the pyLZJD implementation for ptototyipng and learning / 
 
 ## Why not use pyLZJD?
 
-There currently exists the original [Java implementation](https://github.com/EdwardRaff/jLZJD) and a [C++ implementation](https://github.com/EdwardRaff/LZJD) of the LZJD algorithm. While we have implemented the main portion in Cythin, this version is currently 40-100 times slower than these more optimized implementations. If you need efficiency or plan to replort timing numbers, please do not use this version. 
+There currently exists the original [Java implementation](https://github.com/EdwardRaff/jLZJD) and a [C++ implementation](https://github.com/EdwardRaff/LZJD) of the LZJD algorithm. While we have implemented the main portion in Cython, this version is currently 3-20 times slower than these more optimized implementations. If you need efficiency or plan to report timing numbers, please do not use this version. 
 
 ## Citations
 
