@@ -16,9 +16,21 @@ We currently recommend the pyLZJD implementation for ptototyipng and learning / 
 
 There currently exists the original [Java implementation](https://github.com/EdwardRaff/jLZJD) and a [C++ implementation](https://github.com/EdwardRaff/LZJD) of the LZJD algorithm. While we have implemented the main portion in Cython, this version is currently 3-20 times slower than these more optimized implementations. If you need efficiency or plan to report timing numbers, please do not use this version. 
 
+# Insallation 
+
+To install pyLZJD, you can currently use this syntax with pip:
+```
+pip install git+git://github.com/EdwardRaff/pyLZJD#egg=pyLZJD
+```
+ 
+ Or, you can download the repo and run
+```
+python setup.py install
+```
+
 ## Citations
 
-There are currently two papers related to LZJD. The [original paper](http://www.edwardraff.com/publications/alternative-ncd-lzjd.pdf) that introduces it, and a [followup paper](https://arxiv.org/abs/1708.03346) that shows how LZJD 
+If you use LZJD, please cit it! There are currently two papers related to LZJD. The [original paper](http://www.edwardraff.com/publications/alternative-ncd-lzjd.pdf) that introduces it, and a [followup paper](https://arxiv.org/abs/1708.03346) that shows how LZJD 
 can be used inplace of ssdeep and sdhash, and makes LZJD even faster. Please cite the first paper if you use LZJD at all, and please cite the second as well if you use this implementation as it uses the faster version introduced in 
 the second paper. 
 
