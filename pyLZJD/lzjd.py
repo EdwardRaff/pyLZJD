@@ -1,6 +1,9 @@
-import pyximport; pyximport.install()
-from . import lzjd_cython
 import numpy as np
+
+import pyximport; 
+pyximport.install(setup_args={"include_dirs":np.get_include()})
+from . import lzjd_cython
+
 import os
 from multiprocessing import Pool 
 
@@ -35,7 +38,8 @@ def sim(A, B):
         A = A[0]
     if isinstance(B, tuple):
         B = B[0]
-    intersection_size = float(np.intersect1d(A, B).shape[0])
+    intersection_size = lzjd_cython.intersection_size(A, B)
+    #intersection_size = float(np.intersect1d(A, B, assume_unique=True).shape[0])
     
     #hashes should normally be the same size. Its possible to use different size hashesh tough. 
     #Could happen from small files, or just calling with differen hash_size values
@@ -45,4 +49,4 @@ def sim(A, B):
     #*just* as many hashes as there were members
     min_len = min(A.shape[0], B.shape[0])
     
-    return intersection_size/(2*min_len - intersection_size)
+    return intersection_size/float(2*min_len - intersection_size)

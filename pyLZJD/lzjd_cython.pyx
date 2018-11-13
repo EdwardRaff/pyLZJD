@@ -3,6 +3,11 @@ from cpython cimport array
 import array
 from libc.stdlib cimport malloc, realloc, free
 import numpy as np
+
+#We are going to get a warning from cython that looks like 
+#warning: "Using deprecated NumPy API, disable it by " "#defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION" [-W#warnings]
+#We can ignore it https://stackoverflow.com/questions/25789055/cython-numpy-warning-about-npy-no-deprecated-api-when-using-memoryview
+
 cdef extern from "stdlib.h":
     ctypedef void const_void "const void"
     void qsort(void *base, int nmemb, int size,
@@ -177,3 +182,23 @@ cdef int compare(const_void *va, const_void *vb):
     cdef int b = (<signed int *>vb)[0]
     return (a > b) - (a < b)
     
+@cython.boundscheck(False) # turn off bounds-checking for entire function
+@cython.wraparound(False)  # turn off negative index wrapping for entire function
+def intersection_size(int[::1] A, int[::1] B):
+    cdef unsigned int pos_a = 0
+    cdef unsigned int pos_b = 0
+    cdef unsigned int a_len = A.shape[0]
+    cdef unsigned int b_len = B.shape[0]
+    cdef int int_size = 0
+    
+    while pos_a < a_len and pos_b < b_len:
+        if A[pos_a] < B[pos_b]:
+            pos_a += 1
+        elif A[pos_a] > B[pos_b]:
+            pos_b += 1
+        else: #Equal, increment both AND counter!
+            pos_a += 1
+            pos_b += 1
+            int_size += 1
+    
+    return int_size
