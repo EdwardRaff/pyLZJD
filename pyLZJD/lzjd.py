@@ -8,7 +8,7 @@ import os
 from multiprocessing import Pool 
 
 
-def hash(b, hash_size=1024, mode=None,processes=-1):
+def hash(b, hash_size=1024, mode=None, processes=-1):
     if isinstance(b, list): #Assume this is a list of things to hash. 
         if processes < 0:
             processes = None
@@ -20,7 +20,7 @@ def hash(b, hash_size=1024, mode=None,processes=-1):
         pool.close()
         return to_ret
     #Not a list, assume we are processing a single file
-    if os.path.exists(b): #Was b a path? If it was an valid, lets hash that file!
+    if isinstance(b, str) and os.path.exists(b): #Was b a path? If it was an valid, lets hash that file!
         #TODO: Add new cython code that reads in a file in chunks and interleaves the digest creation
         in_file = open(b, "rb") # opening for [r]eading as [b]inary
         data = in_file.read() # if you only wanted to read 512 bytes, do .read(512)
@@ -58,3 +58,39 @@ def sim(A, B):
     min_len = min(A.shape[0], B.shape[0])
     
     return intersection_size/float(2*min_len - intersection_size)
+
+def vectorize(b, hash_size=1024, k=4, processes=-1):
+    if isinstance(b, list): #Assume this is a list of things to hash. 
+        if processes < 0:
+            processes = None
+        elif processes <= 1: # Assume 0 or 1 means just go single threaded
+            return [z for z in map(vectorize, b)]
+        #Else, go multi threaded!
+        pool = Pool(processes)
+        to_ret = [z for z in pool.map(vectorize, b)]
+        pool.close()
+        return to_ret
+    
+    #Not a list, assume we are processing a single file
+    if isinstance(b, str) and os.path.exists(b): #Was b a path? If it was an valid, lets hash that file!
+        #TODO: Add new cython code that reads in a file in chunks and interleaves the digest creation
+        in_file = open(b, "rb") # opening for [r]eading as [b]inary
+        data = in_file.read() # if you only wanted to read 512 bytes, do .read(512)
+        in_file.close()
+        b = data
+    elif isinstance(b, str): #Was a string?, convert to byte array
+        b = str.encode(b)
+    elif isinstance(b, np.ndarray): #Is a numpy array? Thats OK if its a float - we assume its already been hashed
+        if b.dtype != np.float32:
+            raise ValueError('Input was not a byte array, or a SuperMinHash, our could not be converted to one.')
+    elif isinstance(b, tuple) and len(b) == 2: #This might be a raw output from hash, lets pass the first value through again
+        return vectorize(b[0])
+    elif not isinstance(b, bytes):
+        raise ValueError('Input was not a byte array, our could not be converted to one.')
+    
+    #OK, its now either bytes of np.float32. If bytes, make it a np.float32
+    if isinstance(b, bytes):
+        b = hash(b, hash_size=hash_size, mode="sh")[0]
+        
+    #OK, now its defintly a np.float32, lets convert to feature vector!
+    return lzjd_cython.k_bit_float2vec(b, k)

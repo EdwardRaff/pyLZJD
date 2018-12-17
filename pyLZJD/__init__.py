@@ -3,4 +3,4 @@ name = "pyLZJD"
 import pyximport
 import numpy
 
-from .lzjd import hash, sim
+from .lzjd import hash, sim, vectorize

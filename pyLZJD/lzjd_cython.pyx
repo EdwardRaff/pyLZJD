@@ -3,6 +3,7 @@ from cpython cimport array
 import array
 from libc.stdlib cimport malloc, realloc, free
 import numpy as np
+cimport numpy as np
 from math import floor
 
 
@@ -146,6 +147,8 @@ def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
     return numpy_arr, setLength
 
 
+@cython.boundscheck(False)
+@cython.wraparound(False)   # Deactivate negative indexing.
 cdef xorshift32(unsigned int*  state):
     """
     Small and good quality PRNG used for lzjd_fSH variant. State is a single 32 bit word
@@ -160,6 +163,7 @@ cdef xorshift32(unsigned int*  state):
 
 
 @cython.boundscheck(False)
+@cython.wraparound(False)   # Deactivate negative indexing.
 def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
     """
     This method computes the LZJD set using NEW
@@ -185,7 +189,7 @@ def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
         b[i] = 0
     b[hash_size-1] = hash_size
     
-    h = np.full(shape=(hash_size), fill_value=2**32, dtype=np.float32) #use 2^32 instead of inf b/c min() call later will error otherwise
+    cdef np.ndarray h = np.full(shape=(hash_size), fill_value=2**32, dtype=np.float32) #use 2^32 instead of inf b/c min() call later will error otherwise
     
     
     cdef unsigned int n = setLength
@@ -204,7 +208,7 @@ def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
     for i in range(n):
         #initialize pseudo-random generator with seed d_i
         #Lets use a large prime times the feature hash value
-        PRNG_state = max(1, d[i]*2147483629)
+        PRNG_state = max(1, d[i])
         j = 0
         while j <= a:
             #r ← uniform random number from [0, 1) 
@@ -326,3 +330,41 @@ def intersection_size(int[::1] A, int[::1] B):
             int_size += 1
     
     return int_size
+
+@cython.boundscheck(False) # turn off bounds-checking for entire function
+@cython.wraparound(False)  # turn off negative index wrapping for entire function
+def k_bit_float2vec(float[::1] A, unsigned int k ):
+    """
+    This method takes as input an array of floating point values associated with a SuperMinHash. 
+    To apply the k-bit approach of converting a min-hash to a feature vector from 
+    "Hashing Algorithms for Large-Scale Learning", we need to access the integer representation of
+    the data. 
+    
+    This method does that work, and returns a feature vector of the appropriate size. 
+    -- A is the input min-hash
+    -- k is the number of bits to use in converting it to a feature vector
+    """
+    
+    cdef unsigned int out_size = A.shape[0] * (1<<k)
+    cdef unsigned int mask = (1<<k)-1 # This is the bit mask to apply to features. 
+    
+    cdef np.ndarray h = np.zeros(shape=(out_size), dtype=np.float32)
+    
+    cdef unsigned int i 
+    cdef unsigned int raw_bytes
+    cdef unsigned int pos
+    
+    
+    cdef unsigned int* raw_data = <unsigned int*> &A[0]
+    
+    for i in range(A.shape[0]):
+        #raw_bytes = raw_data[i]
+        raw_bytes = (<unsigned int*>&(A[i]))[0]
+        #Lets apply some iters of XORshift to get better distribution, b/c we might get weirdness with layout of bits in floats for mantisa and exponent 
+        xorshift32(&raw_bytes)
+        xorshift32(&raw_bytes)
+        pos = (1<<k)*i
+        pos += raw_bytes & mask
+        h[pos] = 1.0
+    
+    return h
