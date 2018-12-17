@@ -20,7 +20,7 @@ def hash(b, hash_size=1024, mode=None, processes=-1):
         pool.close()
         return to_ret
     #Not a list, assume we are processing a single file
-    if isinstance(b, str) and os.path.exists(b): #Was b a path? If it was an valid, lets hash that file!
+    if isinstance(b, str) and os.path.isfile(b): #Was b a path? If it was an valid, lets hash that file!
         #TODO: Add new cython code that reads in a file in chunks and interleaves the digest creation
         in_file = open(b, "rb") # opening for [r]eading as [b]inary
         data = in_file.read() # if you only wanted to read 512 bytes, do .read(512)
@@ -72,7 +72,7 @@ def vectorize(b, hash_size=1024, k=4, processes=-1):
         return to_ret
     
     #Not a list, assume we are processing a single file
-    if isinstance(b, str) and os.path.exists(b): #Was b a path? If it was an valid, lets hash that file!
+    if isinstance(b, str) and os.path.isfile(b): #Was b a path? If it was an valid, lets hash that file!
         #TODO: Add new cython code that reads in a file in chunks and interleaves the digest creation
         in_file = open(b, "rb") # opening for [r]eading as [b]inary
         data = in_file.read() # if you only wanted to read 512 bytes, do .read(512)
