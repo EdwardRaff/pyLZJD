@@ -3,6 +3,8 @@ from cpython cimport array
 import array
 from libc.stdlib cimport malloc, realloc, free
 import numpy as np
+from math import floor
+
 
 #We are going to get a warning from cython that looks like 
 #warning: "Using deprecated NumPy API, disable it by " "#defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION" [-W#warnings]
@@ -73,9 +75,12 @@ cdef int MurmurHash_PushByte(char b, unsigned int* cur_len, int* _h1, char* data
     h1_as_if_done = fmix32(h1_as_if_done);
 
     return h1_as_if_done;
-    
+
 @cython.boundscheck(False)
-def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
+cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size):
+    """
+    This method does the lifting to compute the LZ set using the LZJD_f variant of LZJD. 
+    """
     cdef set s1
     s1 = set()
     
@@ -83,11 +88,8 @@ def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
     cdef char data[4]
     cdef int state = 0
     cdef int hash 
-    cdef unsigned int pos = 0
     #Defined b as a char to avoid it becoming a python big-num and causing errors 
     cdef unsigned char b
-    cdef unsigned int i
-    cdef signed int v
 
     for b in input_bytes:
         hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
@@ -97,7 +99,21 @@ def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
             cur_length = 0
             data[0] = data[1] = data[2] = data[3] = 0
             state = 0
-    setLength = len(s1)
+    return s1
+    
+@cython.boundscheck(False)
+def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
+    """
+    This method computes the LZJD set using the original paper's approach. 
+    We find the LZJD_f set, and find the k small hash values (k=hash_size). 
+    We then return that list as the LZJD digest
+    """
+    cdef set s1 = computeLZset(input_bytes, hash_size)
+    
+    cdef unsigned int pos = 0
+    cdef unsigned int i
+    cdef signed int v
+    cdef unsigned int setLength = len(s1)
     
     #Copy set into a new dense array
     cdef signed int* arr = <signed int *>malloc(setLength * cython.sizeof(int))
@@ -128,6 +144,114 @@ def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
     
     #Can the return type be int*?
     return numpy_arr, setLength
+
+
+cdef xorshift32(unsigned int*  state):
+    """
+    Small and good quality PRNG used for lzjd_fSH variant. State is a single 32 bit word
+    """
+    #Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs"
+    cdef unsigned int x = state[0];
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    state[0] = x;
+    return x;
+
+
+@cython.boundscheck(False)
+def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
+    """
+    This method computes the LZJD set using NEW
+    """
+    cdef set s1 = computeLZset(input_bytes, hash_size)
+    
+    cdef unsigned int pos = 0
+    cdef unsigned int i
+    cdef signed int v
+    cdef unsigned int setLength = len(s1)
+    
+    #Copy set into a new dense array, and intialize helper arrays for SuperMinHash algo
+    cdef unsigned signed int* d = <signed int *>malloc(setLength * cython.sizeof(int))
+    cdef signed int* q = <signed int *>malloc(hash_size * cython.sizeof(int))
+    cdef signed int* b = <signed int *>malloc(hash_size * cython.sizeof(int))
+    cdef signed int* p = <signed int *>malloc(hash_size * cython.sizeof(int))
+    for v in s1:
+        d[pos] = v
+        pos = pos + 1
+        
+    for i in range(hash_size):
+        q[i] = -1
+        b[i] = 0
+    b[hash_size-1] = hash_size
+    
+    h = np.full(shape=(hash_size), fill_value=2**32, dtype=np.float32) #use 2^32 instead of inf b/c min() call later will error otherwise
+    
+    
+    cdef unsigned int n = setLength
+    cdef unsigned int m = hash_size
+    cdef unsigned int a = m - 1
+    cdef unsigned int PRNG_state
+    cdef unsigned int j
+    
+    cdef unsigned int r_int
+    cdef unsigned long k_tmp
+    cdef unsigned int k
+    cdef unsigned int swap_tmp 
+    cdef float r
+    cdef unsigned int jp
+    
+    for i in range(n):
+        #initialize pseudo-random generator with seed d_i
+        #Lets use a large prime times the feature hash value
+        PRNG_state = max(1, d[i]*2147483629)
+        j = 0
+        while j <= a:
+            #r ← uniform random number from [0, 1) 
+            r_int = xorshift32(&PRNG_state)
+            r_int >>= 9 # We only want 24 bits of randomness, b/c we need to divide by a value that will fit well as a float
+            r = r_int / float(1 << 24)
+            #k ← uniform random number from {j, . . . ,m − 1}
+            #Ugly way for now, lets just store our rand value in a bigger store (long), then divide.
+            #as if we got a value in [0, 1) and then multiplied by what we needed
+            k_tmp = <unsigned long>xorshift32(&PRNG_state)
+            k_tmp *= (m-1-j)
+            k_tmp /= <long>(0xffffffff) #Max int value
+            k = <int>k_tmp
+            k += j
+            
+            if q[j] != i:
+                #q_j ← i,  p_j ← j
+                q[j] = i
+                p[j] = j
+            #end if
+            if q[k] != i:
+                #q_k ← i, p_k ← k
+                q[k] = i
+                p[k] = k
+            #swap p_j and p_k
+            swap_tmp = p[j]
+            p[j] = p[k]
+            p[k] = swap_tmp
+            
+            if r + j < h[p[j]]:
+                jp = min(floor(h[p[j]]), m-1)
+                h[p[j]] = r + j
+                if j < jp:
+                    b[jp] -= 1
+                    b[j] += 1
+                    while b[a] == 0:
+                        a -= 1
+                    #end while
+                #end if
+            #end if
+            j += 1
+    free(d)
+    free(q)
+    free(b)
+    
+    #Can the return type be int*?
+    return h, setLength
     
 #Wrapper function to call qsort
 cdef void sort(signed int* y, ssize_t l):

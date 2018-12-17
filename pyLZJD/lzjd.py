@@ -8,7 +8,7 @@ import os
 from multiprocessing import Pool 
 
 
-def hash(b, hash_size=1024, processes=-1):
+def hash(b, hash_size=1024, mode=None,processes=-1):
     if isinstance(b, list): #Assume this is a list of things to hash. 
         if processes < 0:
             processes = None
@@ -29,8 +29,10 @@ def hash(b, hash_size=1024, processes=-1):
     elif isinstance(b, str): #Was a string?, convert to byte array
         b = str.encode(b)
     elif not isinstance(b, bytes):
-	    raise ValueError('Input was not a byte array, our could not be converted to one.')
+        raise ValueError('Input was not a byte array, our could not be converted to one.')
 
+    if mode == "SuperHash" or mode == "sh":
+        return lzjd_cython.lzjd_fSH(b, hash_size)
     return lzjd_cython.lzjd_f(b, hash_size)
     
 def sim(A, B):
@@ -38,6 +40,12 @@ def sim(A, B):
         A = A[0]
     if isinstance(B, tuple):
         B = B[0]
+    
+    #What type of hash did we use? If its a np.float32, we did SuperHash
+    if A.dtype == np.float32:
+        return np.sum(A == B)/A.shape[0]
+    #Else, we are doing the normal case of set intersection
+    
     intersection_size = lzjd_cython.intersection_size(A, B)
     #intersection_size = float(np.intersect1d(A, B, assume_unique=True).shape[0])
     
