@@ -175,6 +175,8 @@ def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
     cdef signed int v
     cdef unsigned int setLength = len(s1)
     
+    cdef np.ndarray[float, ndim=1, mode="c"] h = np.full(shape=(hash_size), fill_value=2**32, dtype=np.float32) #use 2^32 instead of inf b/c min() call later will error otherwise
+    
     #Copy set into a new dense array, and intialize helper arrays for SuperMinHash algo
     cdef unsigned signed int* d = <signed int *>malloc(setLength * cython.sizeof(int))
     cdef signed int* q = <signed int *>malloc(hash_size * cython.sizeof(int))
@@ -189,7 +191,7 @@ def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
         b[i] = 0
     b[hash_size-1] = hash_size
     
-    cdef np.ndarray h = np.full(shape=(hash_size), fill_value=2**32, dtype=np.float32) #use 2^32 instead of inf b/c min() call later will error otherwise
+    
     
     
     cdef unsigned int n = setLength
@@ -348,7 +350,7 @@ def k_bit_float2vec(float[::1] A, unsigned int k ):
     cdef unsigned int out_size = A.shape[0] * (1<<k)
     cdef unsigned int mask = (1<<k)-1 # This is the bit mask to apply to features. 
     
-    cdef np.ndarray h = np.zeros(shape=(out_size), dtype=np.float32)
+    cdef np.ndarray[float, ndim=1, mode="c"] h = np.zeros(shape=(out_size), dtype=np.float32)
     
     cdef unsigned int i 
     cdef unsigned int raw_bytes
