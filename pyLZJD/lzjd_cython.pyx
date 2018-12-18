@@ -83,7 +83,7 @@ cdef int MurmurHash_PushByte(char b, unsigned int* cur_len, int* _h1, char* data
     return h1_as_if_done;
 
 @cython.boundscheck(False)
-cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size):
+cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size, float false_seen_prob):
     """
     This method does the lifting to compute the LZ set using the LZJD_f variant of LZJD. 
     """
@@ -96,25 +96,48 @@ cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size):
     cdef int hash 
     #Defined b as a char to avoid it becoming a python big-num and causing errors 
     cdef unsigned char b
-
-    for b in input_bytes:
-        hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
-        if not hash in s1:
-            s1.add(hash)
-            #Reset state
-            cur_length = 0
-            data[0] = data[1] = data[2] = data[3] = 0
-            state = 0
+    
+    cdef unsigned int prng_state = 0
+    cdef unsigned int fast_fs_check = 4294967295 #Used if we have a false-seen prob > 0. Default is max integer value
+    
+    #Check if we should apply over-sampling technique from "Malware Classification and Class Imbalance via Stochastic Hashed LZJD"
+    if false_seen_prob > 0 and false_seen_prob < 1.0:
+        #lets use current time as seed
+        prng_state = int(time.monotonic()*1000)
+        #Fastest way to check if we have a hit on FS prob is to check if next int is less than a specific value
+        fast_fs_check = int((1-false_seen_prob)*fast_fs_check)
+        
+        #SHWEL style hashing
+        for b in input_bytes:
+            hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
+            
+            if not hash in s1 and xorshift32(&prng_state) < fast_fs_check :
+                s1.add(hash)
+                #Reset state
+                cur_length = 0
+                data[0] = data[1] = data[2] = data[3] = 0
+                state = 0
+        
+    else:
+        #Normal run
+        for b in input_bytes:
+            hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
+            if not hash in s1:
+                s1.add(hash)
+                #Reset state
+                cur_length = 0
+                data[0] = data[1] = data[2] = data[3] = 0
+                state = 0
     return s1
     
 @cython.boundscheck(False)
-def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size):
+def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size, float false_seen_prob):
     """
     This method computes the LZJD set using the original paper's approach. 
     We find the LZJD_f set, and find the k small hash values (k=hash_size). 
     We then return that list as the LZJD digest
     """
-    cdef set s1 = computeLZset(input_bytes, hash_size)
+    cdef set s1 = computeLZset(input_bytes, hash_size, false_seen_prob)
     
     cdef unsigned int pos = 0
     cdef unsigned int i
@@ -187,11 +210,11 @@ cdef nextRandInt(unsigned int r_min, unsigned int r_max, unsigned int*  state):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)   # Deactivate negative indexing.
-def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
+def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size, false_seen_prob):
     """
     This method computes the LZJD set using NEW
     """
-    cdef set s1 = computeLZset(input_bytes, hash_size)
+    cdef set s1 = computeLZset(input_bytes, hash_size, false_seen_prob)
     
     cdef unsigned int pos = 0
     cdef unsigned int i
@@ -215,8 +238,6 @@ def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
     b[hash_size-1] = hash_size
     
     
-    
-    
     cdef unsigned int n = setLength
     cdef unsigned int m = hash_size
     cdef unsigned int a = m - 1
@@ -224,7 +245,6 @@ def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
     cdef unsigned int j
     
     cdef unsigned int r_int
-    cdef unsigned long k_tmp
     cdef unsigned int k
     cdef unsigned int swap_tmp 
     cdef float r
@@ -241,13 +261,6 @@ def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
             r_int >>= 9 # We only want 24 bits of randomness, b/c we need to divide by a value that will fit well as a float
             r = r_int / float(1 << 24)
             #k ← uniform random number from {j, . . . ,m − 1}
-            #Ugly way for now, lets just store our rand value in a bigger store (long), then divide.
-            #as if we got a value in [0, 1) and then multiplied by what we needed
-            #k_tmp = <unsigned long>xorshift32(&PRNG_state)
-            #k_tmp *= (m-1-j)
-            #k_tmp /= <long>(0xffffffff) #Max int value
-            #k = <int>k_tmp
-            #k += j
             k = nextRandInt(j, m-1, &PRNG_state)
             
             if q[j] != i:

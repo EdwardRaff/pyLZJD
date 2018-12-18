@@ -16,9 +16,9 @@ def isFile(s):
     except:
         return False
 
-def hash(b, hash_size=1024, mode=None, processes=-1):
+def hash(b, hash_size=1024, mode=None, processes=-1, false_seen_prob=0.0):
     if isinstance(b, list): #Assume this is a list of things to hash. 
-        mapfunc = functools.partial(hash, hash_size=hash_size, mode=mode)
+        mapfunc = functools.partial(hash, hash_size=hash_size, mode=mode, false_seen_prob=false_seen_prob)
         if processes < 0:
             processes = None
         elif processes <= 1: # Assume 0 or 1 means just go single threaded
@@ -41,8 +41,8 @@ def hash(b, hash_size=1024, mode=None, processes=-1):
         raise ValueError('Input was not a byte array, our could not be converted to one.')
 
     if mode == "SuperHash" or mode == "sh":
-        return lzjd_cython.lzjd_fSH(b, hash_size)
-    return lzjd_cython.lzjd_f(b, hash_size)
+        return lzjd_cython.lzjd_fSH(b, hash_size, false_seen_prob)
+    return lzjd_cython.lzjd_f(b, hash_size, false_seen_prob)
     
 def sim(A, B):
     if isinstance(A, tuple):
@@ -68,9 +68,9 @@ def sim(A, B):
     
     return intersection_size/float(2*min_len - intersection_size)
 
-def vectorize(b, hash_size=1024, k=8, processes=-1):
+def vectorize(b, hash_size=1024, k=8, processes=-1, false_seen_prob=0.0):
     if isinstance(b, list): #Assume this is a list of things to hash. 
-        mapfunc = functools.partial(vectorize, hash_size=hash_size, k=k)
+        mapfunc = functools.partial(vectorize, hash_size=hash_size, k=k, false_seen_prob=false_seen_prob)
         if processes < 0:
             processes = None
         elif processes <= 1: # Assume 0 or 1 means just go single threaded
@@ -100,7 +100,7 @@ def vectorize(b, hash_size=1024, k=8, processes=-1):
     
     #OK, its now either bytes of np.float32. If bytes, make it a np.float32
     if isinstance(b, bytes):
-        b = hash(b, hash_size=hash_size, mode="sh")[0]
+        b = hash(b, hash_size=hash_size, mode="sh", false_seen_prob=false_seen_prob)[0]
         
     #OK, now its defintly a np.float32, lets convert to feature vector!
     return lzjd_cython.k_bit_float2vec(b, k)
