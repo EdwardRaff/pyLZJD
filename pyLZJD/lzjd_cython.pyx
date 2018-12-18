@@ -7,6 +7,8 @@ cimport numpy as np
 from math import floor
 from scipy.sparse import csr_matrix 
 
+import time
+
 
 
 
@@ -164,6 +166,24 @@ cdef xorshift32(unsigned int*  state):
     state[0] = x;
     return x;
 
+cdef nextRandInt(unsigned int r_min, unsigned int r_max, unsigned int*  state):
+    """
+    Helper function that provides a fast way of getting random integers in a given range. 
+    r_min is the minimum value of this range
+    r_max is the maximum value of this range. 
+    state is a pointer to the state of the PRNG, and will be modified using xorshift32. 
+    """
+    cdef unsigned long k_tmp
+    cdef unsigned int k
+    
+    k_tmp = <unsigned long>xorshift32(state)
+    k_tmp *= (r_max-r_min)
+    k_tmp /= <long>(0xffffffff) #Max int value
+    k = <int>k_tmp
+    k += r_min
+    
+    return k
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)   # Deactivate negative indexing.
@@ -223,11 +243,12 @@ def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size):
             #k ← uniform random number from {j, . . . ,m − 1}
             #Ugly way for now, lets just store our rand value in a bigger store (long), then divide.
             #as if we got a value in [0, 1) and then multiplied by what we needed
-            k_tmp = <unsigned long>xorshift32(&PRNG_state)
-            k_tmp *= (m-1-j)
-            k_tmp /= <long>(0xffffffff) #Max int value
-            k = <int>k_tmp
-            k += j
+            #k_tmp = <unsigned long>xorshift32(&PRNG_state)
+            #k_tmp *= (m-1-j)
+            #k_tmp /= <long>(0xffffffff) #Max int value
+            #k = <int>k_tmp
+            #k += j
+            k = nextRandInt(j, m-1, &PRNG_state)
             
             if q[j] != i:
                 #q_j ← i,  p_j ← j

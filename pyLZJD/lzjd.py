@@ -7,6 +7,7 @@ from . import lzjd_cython
 import os
 from multiprocessing import Pool 
 import functools
+import scipy
 
 
 def isFile(s):
@@ -78,7 +79,7 @@ def vectorize(b, hash_size=1024, k=8, processes=-1):
         pool = Pool(processes)
         to_ret = [z for z in pool.map(mapfunc, b)]
         pool.close()
-        return to_ret
+        return scipy.sparse.vstack(to_ret) #Make it into one big matrix please, k-thnx
     
     #Not a list, assume we are processing a single file
     if isFile(b): #Was b a path? If it was an valid, lets hash that file!
