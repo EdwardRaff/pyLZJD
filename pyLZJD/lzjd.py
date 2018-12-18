@@ -6,21 +6,29 @@ from . import lzjd_cython
 
 import os
 from multiprocessing import Pool 
+import functools
 
+
+def isFile(s):
+    try:
+        return isinstance(b, str) and os.path.isfile(b)
+    except:
+        return False
 
 def hash(b, hash_size=1024, mode=None, processes=-1):
     if isinstance(b, list): #Assume this is a list of things to hash. 
+        mapfunc = functools.partial(hash, hash_size=hash_size, mode=mode)
         if processes < 0:
             processes = None
         elif processes <= 1: # Assume 0 or 1 means just go single threaded
-            return [z for z in map(hash, b)]
+            return [z for z in map(mapfunc, b)]
         #Else, go multi threaded!
         pool = Pool(processes)
-        to_ret = [z for z in pool.map(hash, b)]
+        to_ret = [z for z in pool.map(mapfunc, b)]
         pool.close()
         return to_ret
     #Not a list, assume we are processing a single file
-    if isinstance(b, str) and os.path.isfile(b): #Was b a path? If it was an valid, lets hash that file!
+    if isFile(b): #Was b a path? If it was an valid, lets hash that file!
         #TODO: Add new cython code that reads in a file in chunks and interleaves the digest creation
         in_file = open(b, "rb") # opening for [r]eading as [b]inary
         data = in_file.read() # if you only wanted to read 512 bytes, do .read(512)
@@ -59,20 +67,21 @@ def sim(A, B):
     
     return intersection_size/float(2*min_len - intersection_size)
 
-def vectorize(b, hash_size=1024, k=4, processes=-1):
+def vectorize(b, hash_size=1024, k=8, processes=-1):
     if isinstance(b, list): #Assume this is a list of things to hash. 
+        mapfunc = functools.partial(vectorize, hash_size=hash_size, k=k)
         if processes < 0:
             processes = None
         elif processes <= 1: # Assume 0 or 1 means just go single threaded
-            return [z for z in map(vectorize, b)]
+            return [z for z in map(mapfunc, b)]
         #Else, go multi threaded!
         pool = Pool(processes)
-        to_ret = [z for z in pool.map(vectorize, b)]
+        to_ret = [z for z in pool.map(mapfunc, b)]
         pool.close()
         return to_ret
     
     #Not a list, assume we are processing a single file
-    if isinstance(b, str) and os.path.isfile(b): #Was b a path? If it was an valid, lets hash that file!
+    if isFile(b): #Was b a path? If it was an valid, lets hash that file!
         #TODO: Add new cython code that reads in a file in chunks and interleaves the digest creation
         in_file = open(b, "rb") # opening for [r]eading as [b]inary
         data = in_file.read() # if you only wanted to read 512 bytes, do .read(512)

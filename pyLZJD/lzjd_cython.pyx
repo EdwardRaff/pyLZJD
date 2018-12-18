@@ -5,6 +5,9 @@ from libc.stdlib cimport malloc, realloc, free
 import numpy as np
 cimport numpy as np
 from math import floor
+from scipy.sparse import csr_matrix 
+
+
 
 
 #We are going to get a warning from cython that looks like 
@@ -350,7 +353,14 @@ def k_bit_float2vec(float[::1] A, unsigned int k ):
     cdef unsigned int out_size = A.shape[0] * (1<<k)
     cdef unsigned int mask = (1<<k)-1 # This is the bit mask to apply to features. 
     
-    cdef np.ndarray[float, ndim=1, mode="c"] h = np.zeros(shape=(out_size), dtype=np.float32)
+    #Dont use np array, dense wastes too much memory
+    #cdef np.ndarray[float, ndim=1, mode="c"] h = np.zeros(shape=(out_size), dtype=np.float32)
+    #Well use a scipy sparase array, defined by data and non-zero row position
+    #Its a one hot vector, and nnz = A.shape[0], so just fill with 1.0
+    cdef np.ndarray[float, ndim=1, mode="c"] data = np.full(shape=(A.shape[0]), fill_value=1.0, dtype=np.float32)
+    #row index is easy b/c we are doing a single row, so its all the same row
+    cdef np.ndarray[int, ndim=1, mode="c"] row_ind = np.full(shape=(A.shape[0]), fill_value=0, dtype=np.int32)
+    cdef np.ndarray[int, ndim=1, mode="c"] col_ind = np.zeros(shape=(A.shape[0]), dtype=np.int32)
     
     cdef unsigned int i 
     cdef unsigned int raw_bytes
@@ -367,6 +377,9 @@ def k_bit_float2vec(float[::1] A, unsigned int k ):
         xorshift32(&raw_bytes)
         pos = (1<<k)*i
         pos += raw_bytes & mask
-        h[pos] = 1.0
+        #h[pos] = 1.0
+        col_ind[i] = pos
     
-    return h
+    #return np.zeros(shape=(1), dtype=np.int32)
+    #return (data, (row_ind, col_ind))
+    return csr_matrix((data, (row_ind, col_ind)), shape=(1,out_size))
