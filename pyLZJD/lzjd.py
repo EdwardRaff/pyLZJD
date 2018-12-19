@@ -12,7 +12,7 @@ import scipy
 
 def isFile(s):
     try:
-        return isinstance(b, str) and os.path.isfile(b)
+        return isinstance(s, str) and os.path.isfile(s)
     except:
         return False
 
