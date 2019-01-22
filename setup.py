@@ -15,7 +15,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="pyLZJD",
-    version="0.0.1",
+    version="0.0.2",
     author="Edward Raff",
     author_email="raff.edward@gmail.com",
     description="A small example package",
