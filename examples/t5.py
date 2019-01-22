@@ -8,7 +8,7 @@ from sklearn.neighbors import KNeighborsClassifier
 
 import matplotlib.pyplot as plt
 
-from pyLZJD import hash, sim
+from pyLZJD import digest, sim
 
 #First, lets check if we have the t5 corpus
 if not (os.path.exists("t5-corpus.zip") or os.path.exists("t5") ):
@@ -29,7 +29,7 @@ print("Labels:", labels_true)
 Y = np.asarray([ labels_true.index(x[x.find(".")+1:]) for x in X_paths])
 
 #Lets hash all the files now! We have a list of paths, pyLZJD can take that dirrectly and convert it to hashes
-X_hashes = hash(X_paths, processes=1)
+X_hashes = digest(X_paths, processes=-1, mode="sh")
 print("Done hashing!")
 #We are going to use some tools from scikit-learn. It needs a distance function between data stored as a list of vectors. 
 #So we will create a list of 1-D vectors, each each vector sotres the index to it's hash in X_hashes
@@ -49,7 +49,7 @@ scores = cross_val_score(knn_model, X, Y, cv=5)
 print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
 
-X_embedded = TSNE(n_components=2, metric=lzjd_dist).fit_transform(X)
+X_embedded = TSNE(n_components=2, perplexity=5, metric=lzjd_dist).fit_transform(X)
 
 colors = [plt.cm.Spectral(each) for each in np.linspace(0, 1, len(labels_true))]
 for k, col in zip([z for z in range(len(labels_true))], colors):

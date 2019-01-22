@@ -16,7 +16,7 @@ def isFile(s):
     except:
         return False
 
-def hash(b, hash_size=1024, mode=None, processes=-1, false_seen_prob=0.0):
+def digest(b, hash_size=1024, mode=None, processes=-1, false_seen_prob=0.0):
     if isinstance(b, list): #Assume this is a list of things to hash. 
         mapfunc = functools.partial(hash, hash_size=hash_size, mode=mode, false_seen_prob=false_seen_prob)
         if processes < 0:
