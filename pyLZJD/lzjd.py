@@ -18,7 +18,7 @@ def isFile(s):
 
 def digest(b, hash_size=1024, mode=None, processes=-1, false_seen_prob=0.0):
     if isinstance(b, list): #Assume this is a list of things to hash. 
-        mapfunc = functools.partial(hash, hash_size=hash_size, mode=mode, false_seen_prob=false_seen_prob)
+        mapfunc = functools.partial(digest, hash_size=hash_size, mode=mode, false_seen_prob=false_seen_prob)
         if processes < 0:
             processes = None
         elif processes <= 1: # Assume 0 or 1 means just go single threaded
@@ -100,7 +100,7 @@ def vectorize(b, hash_size=1024, k=8, processes=-1, false_seen_prob=0.0):
     
     #OK, its now either bytes of np.float32. If bytes, make it a np.float32
     if isinstance(b, bytes):
-        b = hash(b, hash_size=hash_size, mode="sh", false_seen_prob=false_seen_prob)[0]
+        b = digest(b, hash_size=hash_size, mode="sh", false_seen_prob=false_seen_prob)[0]
         
     #OK, now its defintly a np.float32, lets convert to feature vector!
     return lzjd_cython.k_bit_float2vec(b, k)
