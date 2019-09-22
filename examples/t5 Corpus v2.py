@@ -3,22 +3,17 @@
 """
 Created on Fri Sep 20 18:11:39 2019
 
-Re-Organization of the t5 Corpus example:
- 1-Tasks are seperated into different functions
- to allow easy modification for different purposes.
-
-
-@author: Malware Analysis Lab (UMBC)
+@author: Malware Analysis Lab
 """
 # LIBRARIES NEEDED
 import os
 import glob
 import numpy as np
+import matplotlib.pyplot as plt
+from pyLZJD import digest, sim
 from sklearn.manifold import TSNE
 from sklearn.model_selection import cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
-import matplotlib.pyplot as plt
-from pyLZJD import digest, sim
 
 
 
@@ -28,10 +23,9 @@ DATASET_URL       = 'http://roussev.net/t5/t5-corpus.zip'
 TITLE             = 'TSNE Visualization'
 PLOT_FILE_NAME    = "t5_perp5.pdf"
 PATH_NAME_PATTERN = "t5/*"
+PROCESSES         = -1
 
 X_hashes # @todo Not sure how lzjd_dist used so must ask...
-
-
 
 #==============================================================================
 # DRIVER
@@ -107,7 +101,7 @@ def hash_files(X_paths):
     Lets hash all the files now! We have a list of paths, 
     pyLZJD can take that dirrectly and convert it to hashes
     '''
-    X_hashes = digest(X_paths, processes=-1)
+    X_hashes = digest(X_paths, processes=PROCESSES)
     print("Done hashing!")
     
     return X_hashes
@@ -127,6 +121,7 @@ def create_1D_vector(X_hashes):
     X = [ [i] for i in range(len(X_hashes))]
     
     return X
+
 
 
 
@@ -190,8 +185,7 @@ def plot(labels_true, X, Y):
     plt.legend(loc='upper left')
     plt.savefig(PLOT_FILE_NAME)
     plt.show()
-  
-
+    
     
 # START
 if __name__ == "__main__":

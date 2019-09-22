@@ -38,7 +38,7 @@ def digest(b, hash_size=1024, mode=None, processes=-1, false_seen_prob=0.0):
     elif isinstance(b, str): #Was a string?, convert to byte array
         b = str.encode(b)
     elif not isinstance(b, bytes):
-        raise ValueError('Input was not a byte array, our could not be converted to one.')
+        raise ValueError('Input was not a byte array, or could not be converted to one.')
 
     if mode == "SuperHash" or mode == "sh":
         return lzjd_cython.lzjd_fSH(b, hash_size, false_seen_prob)
