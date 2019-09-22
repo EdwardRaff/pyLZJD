@@ -9,7 +9,6 @@ Created on Fri Sep 20 18:11:39 2019
 import os
 import glob
 import numpy as np
-
 import matplotlib.pyplot as plt
 from pyLZJD import digest, sim
 from sklearn.manifold import TSNE
@@ -26,7 +25,7 @@ PLOT_FILE_NAME    = "t5_perp5.pdf"
 PATH_NAME_PATTERN = "t5/*"
 PROCESSES         = -1
 
-X_hashes = ' '# @todo Not sure how lzjd_dist used so must ask...
+global X_hashes # @todo Not sure how lzjd_dist used so must ask...
 
 #==============================================================================
 # DRIVER
@@ -134,7 +133,7 @@ def lzjd_dist(a, b):
     '''
     Now we define a distance function between two vectors in X. 
     It accesses the index value, and computes the LZJD distance
-	'''
+    '''
     a_i = X_hashes[int(a[0])]
     b_i = X_hashes[int(b[0])]
 	
