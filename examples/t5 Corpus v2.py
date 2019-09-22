@@ -9,6 +9,7 @@ Created on Fri Sep 20 18:11:39 2019
 import os
 import glob
 import numpy as np
+
 import matplotlib.pyplot as plt
 from pyLZJD import digest, sim
 from sklearn.manifold import TSNE
@@ -25,7 +26,7 @@ PLOT_FILE_NAME    = "t5_perp5.pdf"
 PATH_NAME_PATTERN = "t5/*"
 PROCESSES         = -1
 
-X_hashes # @todo Not sure how lzjd_dist used so must ask...
+X_hashes = ' '# @todo Not sure how lzjd_dist used so must ask...
 
 #==============================================================================
 # DRIVER
@@ -62,9 +63,10 @@ def download_dataset():
         print("Downloading ", DATASET_FILE_NAME)
         import urllib.request
         try:
-            lib.request.urlretrieve(DATASET_URL, DATASET_FILE_NAME)
+            urllib.request.urlretrieve(DATASET_URL, DATASET_FILE_NAME)
         except Exception as e:
             print("Error while downloading the dataset")
+            print(e)
 	
     # Unzip the dataset
     import zipfile
