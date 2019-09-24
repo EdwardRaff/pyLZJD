@@ -25,7 +25,6 @@ PLOT_FILE_NAME    = "t5_perp5.pdf"
 PATH_NAME_PATTERN = "t5/*"
 PROCESSES         = -1
 
-global X_hashes # @todo Not sure how lzjd_dist used so must ask...
 
 #==============================================================================
 # DRIVER
@@ -45,10 +44,10 @@ def driver():
     X = create_1D_vector(X_hashes)
     
     # train the model
-    train(X, Y)
+    train(X, Y, X_hashes)
     
     # plot the model
-    plot(labels_true, X, Y)
+    plot(labels_true, X, Y, X_hashes)
     
     
     
@@ -129,7 +128,7 @@ def create_1D_vector(X_hashes):
 #==============================================================================
 # Compute distence between two factors
 #============================================================================== 
-def lzjd_dist(a, b):
+def lzjd_dist(a, b, **X_hashes):
     '''
     Now we define a distance function between two vectors in X. 
     It accesses the index value, and computes the LZJD distance
@@ -144,10 +143,11 @@ def lzjd_dist(a, b):
 #==============================================================================
 # Train the model
 #============================================================================== 
-def train(X, Y):
+def train(X, Y, X_hashes):
     knn_model = KNeighborsClassifier(n_neighbors=5, \
                                      algorithm='brute', \
-                                     metric=lzjd_dist)
+                                     metric=lzjd_dist, \
+                                     metric_params=X_hashes)
     
     scores = cross_val_score(knn_model, X, Y, cv=5)
     print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), \
@@ -158,10 +158,11 @@ def train(X, Y):
 #==============================================================================
 # Plot the model
 #============================================================================== 
-def plot(labels_true, X, Y):
+def plot(labels_true, X, Y, X_hashes):
     X_embedded = TSNE(n_components=2, \
                       perplexity=5, \
-                      metric=lzjd_dist).fit_transform(X)
+                      metric=lzjd_dist, \
+                      metric_params=X_hashes).fit_transform(X)
     
     # define the colors to be used in the plot
     colors = [plt.cm.Spectral(each) \
@@ -191,3 +192,4 @@ def plot(labels_true, X, Y):
 # START
 if __name__ == "__main__":
     driver()
+    
