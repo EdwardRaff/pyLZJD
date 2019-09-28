@@ -8,7 +8,6 @@ Created on Fri Sep 20 18:11:39 2019
 # LIBRARIES NEEDED
 import os
 import glob
-import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from pyLZJD import digest, sim
