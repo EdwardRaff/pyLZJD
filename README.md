@@ -30,7 +30,7 @@ python setup.py install
 
 ## Citations
 
-If you use LZJD, please cit it! There are currently two papers related to LZJD. The [original paper](http://www.edwardraff.com/publications/alternative-ncd-lzjd.pdf) that introduces it, and a [followup paper](https://arxiv.org/abs/1708.03346) that shows how LZJD 
+If you use LZJD, please cite it! There are currently two papers related to LZJD. The [original paper](http://www.edwardraff.com/publications/alternative-ncd-lzjd.pdf) that introduces it, and a [followup paper](https://arxiv.org/abs/1708.03346) that shows how LZJD 
 can be used inplace of ssdeep and sdhash, and makes LZJD even faster. Please cite the first paper if you use LZJD at all, and please cite the second as well if you use this implementation as it uses the faster version introduced in 
 the second paper. 
 
