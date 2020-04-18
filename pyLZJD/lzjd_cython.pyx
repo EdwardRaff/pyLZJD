@@ -83,7 +83,7 @@ cdef int MurmurHash_PushByte(char b, unsigned int* cur_len, int* _h1, char* data
     return h1_as_if_done;
 
 @cython.boundscheck(False)
-cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size, float false_seen_prob):
+cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
     """
     This method does the lifting to compute the LZ set using the LZJD_f variant of LZJD. 
     """
@@ -103,7 +103,7 @@ cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size, fl
     #Check if we should apply over-sampling technique from "Malware Classification and Class Imbalance via Stochastic Hashed LZJD"
     if false_seen_prob > 0 and false_seen_prob < 1.0:
         #lets use current time as seed
-        prng_state = int(time.monotonic()*1000)
+        prng_state = seed
         #Fastest way to check if we have a hit on FS prob is to check if next int is less than a specific value
         fast_fs_check = int((1-false_seen_prob)*fast_fs_check)
         
@@ -131,13 +131,13 @@ cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size, fl
     return s1
     
 @cython.boundscheck(False)
-def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size, float false_seen_prob):
+def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
     """
     This method computes the LZJD set using the original paper's approach. 
     We find the LZJD_f set, and find the k small hash values (k=hash_size). 
     We then return that list as the LZJD digest
     """
-    cdef set s1 = computeLZset(input_bytes, hash_size, false_seen_prob)
+    cdef set s1 = computeLZset(input_bytes, hash_size, false_seen_prob, seed)
     
     cdef unsigned int pos = 0
     cdef unsigned int i
@@ -210,11 +210,11 @@ cdef nextRandInt(unsigned int r_min, unsigned int r_max, unsigned int*  state):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)   # Deactivate negative indexing.
-def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size, false_seen_prob):
+def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
     """
     This method computes the LZJD set using NEW
     """
-    cdef set s1 = computeLZset(input_bytes, hash_size, false_seen_prob)
+    cdef set s1 = computeLZset(input_bytes, hash_size, false_seen_prob, seed)
     
     cdef unsigned int pos = 0
     cdef unsigned int i

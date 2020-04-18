@@ -8,7 +8,7 @@ import os
 from multiprocessing import Pool 
 import functools
 import scipy
-
+import time
 
 def isFile(s):
     try:
@@ -16,9 +16,9 @@ def isFile(s):
     except:
         return False
 
-def digest(b, hash_size=1024, mode=None, processes=-1, false_seen_prob=0.0):
+def digest(b, hash_size=1024, mode=None, processes=-1, false_seen_prob=0.0, seed=None):
     if isinstance(b, list): #Assume this is a list of things to hash. 
-        mapfunc = functools.partial(digest, hash_size=hash_size, mode=mode, false_seen_prob=false_seen_prob)
+        mapfunc = functools.partial(digest, hash_size=hash_size, mode=mode, false_seen_prob=false_seen_prob, seed=seed)
         if processes < 0:
             processes = None
         elif processes <= 1: # Assume 0 or 1 means just go single threaded
@@ -40,9 +40,12 @@ def digest(b, hash_size=1024, mode=None, processes=-1, false_seen_prob=0.0):
     elif not isinstance(b, bytes):
         raise ValueError('Input was not a byte array, or could not be converted to one.')
 
+    if seed is None:
+        seed = int(time.monotonic()*1000)
+
     if mode == "SuperHash" or mode == "sh":
-        return lzjd_cython.lzjd_fSH(b, hash_size, false_seen_prob)
-    return lzjd_cython.lzjd_f(b, hash_size, false_seen_prob)
+        return lzjd_cython.lzjd_fSH(b, hash_size, false_seen_prob, seed)
+    return lzjd_cython.lzjd_f(b, hash_size, false_seen_prob, seed)
     
 def sim(A, B):
     if isinstance(A, tuple):
@@ -68,9 +71,9 @@ def sim(A, B):
     
     return intersection_size/float(2*min_len - intersection_size)
 
-def vectorize(b, hash_size=1024, k=8, processes=-1, false_seen_prob=0.0):
+def vectorize(b, hash_size=1024, k=8, processes=-1, false_seen_prob=0.0, seed=None):
     if isinstance(b, list): #Assume this is a list of things to hash. 
-        mapfunc = functools.partial(vectorize, hash_size=hash_size, k=k, false_seen_prob=false_seen_prob)
+        mapfunc = functools.partial(vectorize, hash_size=hash_size, k=k, false_seen_prob=false_seen_prob, seed=seed)
         if processes < 0:
             processes = None
         elif processes <= 1: # Assume 0 or 1 means just go single threaded
@@ -100,7 +103,7 @@ def vectorize(b, hash_size=1024, k=8, processes=-1, false_seen_prob=0.0):
     
     #OK, its now either bytes of np.float32. If bytes, make it a np.float32
     if isinstance(b, bytes):
-        b = digest(b, hash_size=hash_size, mode="sh", false_seen_prob=false_seen_prob)[0]
+        b = digest(b, hash_size=hash_size, mode="sh", false_seen_prob=false_seen_prob, seed=seed)[0]
         
     #OK, now its defintly a np.float32, lets convert to feature vector!
     return lzjd_cython.k_bit_float2vec(b, k)
