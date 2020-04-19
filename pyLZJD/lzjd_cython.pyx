@@ -7,6 +7,7 @@ cimport numpy as np
 from math import floor
 from scipy.sparse import csr_matrix
 from cpython cimport set
+from libc.math cimport floor, fmin
 
 import time
 
@@ -25,6 +26,68 @@ cdef extern from "stdlib.h":
 
 # Helper functions we need
 
+cdef int FREE = 1
+cdef int OCCUPIED = 0
+
+
+##Functions for C based hash set
+
+cdef array.array twinPrimesP2 = array.array('i', [ 7, 13, 19, 43, 73, 139, 271, 523, 1033, 2083, 4129, 8221,
+    16453, 32803, 65539, 131113, 262153, 524353, 1048891, 2097259, 4194583,
+    8388619, 16777291, 33554503, 67109323, 134217781, 268435579,
+    536871019, 1073741833, 2147482951,
+])
+
+@cython.boundscheck(False)
+@cython.wraparound(False)   # Deactivate negative indexing.
+@cython.initializedcheck(False)
+@cython.cdivision(True)
+# cdef int getIndex(int key, unsigned int* keys, unsigned char* status, unsigned int _len):
+cdef int getIndex(int key, int[:] keys, int[:] status):
+    #D1
+    cdef int _len = len(status)
+    cdef int h = key & 0x7fffffff
+    cdef int i = h % _len
+
+    #D2
+    if(status[i] == FREE or keys[i] == key):
+        return i
+
+    #D3
+    cdef int c = 1 + (h % (_len -2))
+
+    while True:#this loop will terminate
+        #D4
+        i -= c
+        if(i < 0):
+            i += _len
+        #D5
+        if( status[i] == FREE or keys[i] == key):
+            return i;
+    
+
+# cdef int add_set(int e, unsigned int* keys, unsigned char* status, unsigned int _len):
+@cython.boundscheck(False)
+@cython.wraparound(False)   # Deactivate negative indexing.
+@cython.initializedcheck(False)
+@cython.cdivision(True)
+cdef int add_set(int e, int[:] keys, int[:] status):
+    cdef int key = e;
+    cdef int pair_index = getIndex(key, keys, status);
+    cdef int valOrFreeIndex = pair_index;
+
+    if(status[valOrFreeIndex] == OCCUPIED): #easy case
+        return 0; #we already had this item in the set!
+    
+    cdef int i = valOrFreeIndex;
+
+    status[i] = OCCUPIED;
+    keys[i] = key;
+    #used+=1;
+
+    return 1;#item was not in the set previously
+
+
 #Rotate bits function
 @cython.boundscheck(False)
 cdef unsigned int ROTL32(unsigned int x, char r):
@@ -41,6 +104,10 @@ cdef int fmix32 ( int h ):
     return h
 
 
+@cython.boundscheck(False) # turn off bounds-checking for entire function
+@cython.wraparound(False)  # turn off negative index wrapping for entire function
+@cython.initializedcheck(False)
+@cython.cdivision(True)
 cdef int MurmurHash_PushByte(char b, unsigned int* cur_len, int* _h1, char* data):
     cdef unsigned int _len = cur_len[0]
     
@@ -84,18 +151,23 @@ cdef int MurmurHash_PushByte(char b, unsigned int* cur_len, int* _h1, char* data
 
     return h1_as_if_done;
 
-@cython.boundscheck(False)
-cdef computeLZset(const unsigned char[::1] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
+@cython.boundscheck(False) # turn off bounds-checking for entire function
+@cython.wraparound(False)  # turn off negative index wrapping for entire function
+@cython.initializedcheck(False)
+@cython.cdivision(True)
+cdef unsigned int computeLZset(const unsigned char[::1] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed, int[:] keys, int[:] status):
     """
     This method does the lifting to compute the LZ set using the LZJD_f variant of LZJD.
     """
-    cdef set s1
-    s1 = set()
+#     cdef set s1
+#     s1 = set()
     
     cdef unsigned int cur_length = 0
+    cdef unsigned int set_size = 0
     cdef char data[4]
     cdef int state = 0
     cdef int hash
+    cdef int index
     #Defined b as a char to avoid it becoming a python big-num and causing errors
     cdef unsigned char b
     
@@ -116,8 +188,12 @@ cdef computeLZset(const unsigned char[::1] input_bytes, unsigned int hash_size, 
             b = raw_input[i]
             hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
             
-            if not hash in s1 and xorshift32(&prng_state) < fast_fs_check :
-                s1.add(hash)
+            index = getIndex(hash, keys, status)
+            if (status[index] != OCCUPIED) and xorshift32(&prng_state) < fast_fs_check :
+                #s1.add(hash)
+                status[index] = OCCUPIED;
+                keys[index] = hash;
+                set_size += 1
                 #Reset state
                 cur_length = 0
                 data[0] = data[1] = data[2] = data[3] = 0
@@ -128,33 +204,58 @@ cdef computeLZset(const unsigned char[::1] input_bytes, unsigned int hash_size, 
         for i in range(len(input_bytes)):
             b = raw_input[i]
             hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
-            if not hash in s1:
-                s1.add(hash)
+            index = getIndex(hash, keys, status)
+            if status[index] != OCCUPIED:
+                #s1.add(hash)
+                status[index] = OCCUPIED;
+                keys[index] = hash;
+                set_size += 1
                 #Reset state
                 cur_length = 0
                 data[0] = data[1] = data[2] = data[3] = 0
                 state = 0
-    return s1
+    return set_size
     
-@cython.boundscheck(False)
+@cython.boundscheck(False) # turn off bounds-checking for entire function
+@cython.wraparound(False)  # turn off negative index wrapping for entire function
+@cython.initializedcheck(False)
+@cython.cdivision(True)
 def lzjd_f(const unsigned char[::1] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
     """
     This method computes the LZJD set using the original paper's approach.
     We find the LZJD_f set, and find the k small hash values (k=hash_size).
     We then return that list as the LZJD digest
     """
-    cdef set s1 = computeLZset(input_bytes, hash_size, false_seen_prob, seed)
+    
+    #First, figure out how big we need our hash-set to be to def be good
+    cdef unsigned int _set_len = 0
+    while twinPrimesP2[_set_len]//2 < len(input_bytes):
+        _set_len += 1
+    _set_len = twinPrimesP2[_set_len]
+    #Allocate the set
+    #cdef int* keys = <int *>malloc(_set_len * cython.sizeof(int))
+    #cdef unsigned char* keys = <unsigned char *>malloc(_set_len * cython.sizeof(char))
+    cdef int[:] keys = array.array('i', [0]*_set_len)
+    cdef int[:] status = array.array('i', [FREE]*_set_len)
+    
+    
+    #cdef set s1 = computeLZset(input_bytes, hash_size, false_seen_prob, seed)
+    #cdef unsigned int setLength = len(s1)
+    cdef unsigned int setLength = computeLZset(input_bytes, hash_size, false_seen_prob, seed, keys, status)
     
     cdef unsigned int pos = 0
     cdef unsigned int i
     cdef signed int v
-    cdef unsigned int setLength = len(s1)
+    
     
     #Copy set into a new dense array
-    cdef signed int* arr = <signed int *>malloc(setLength * cython.sizeof(int))
-    for v in s1:
-        arr[pos] = v
-        pos = pos + 1
+    #cdef signed int* arr = <signed int *>malloc(setLength * cython.sizeof(int))
+    cdef array.array arr = array.array('i', [0]*setLength)
+#     for v in s1:
+    for i in range(len(status)):
+        if status[i] == OCCUPIED:
+            arr.data.as_ints[pos] = keys[i]#v
+            pos = pos + 1
     
         
     cdef unsigned int test_size
@@ -166,7 +267,7 @@ def lzjd_f(const unsigned char[::1] input_bytes, unsigned int hash_size, float f
         #arr =  <signed int *>realloc(arr, hash_size * cython.sizeof(int))
     else:
         test_size = setLength
-    sort(arr, test_size)
+    sort(arr.data.as_ints, test_size)
     
     #O(n) convert to numpy array
     #TODO: Use arrays more efficiently here.
@@ -174,8 +275,8 @@ def lzjd_f(const unsigned char[::1] input_bytes, unsigned int hash_size, float f
     for i in range(test_size):
         numpy_arr[i] = arr[i]
         
-    free(arr)
-    arr = NULL
+    #free(arr)
+    #arr = NULL
     
     #Can the return type be int*?
     return numpy_arr, setLength
@@ -183,7 +284,9 @@ def lzjd_f(const unsigned char[::1] input_bytes, unsigned int hash_size, float f
 
 @cython.boundscheck(False)
 @cython.wraparound(False)   # Deactivate negative indexing.
-cdef xorshift32(unsigned int*  state):
+@cython.initializedcheck(False)
+@cython.cdivision(True)
+cdef unsigned int xorshift32(unsigned int*  state):
     """
     Small and good quality PRNG used for lzjd_fSH variant. State is a single 32 bit word
     """
@@ -195,7 +298,11 @@ cdef xorshift32(unsigned int*  state):
     state[0] = x;
     return x;
 
-cdef nextRandInt(unsigned int r_min, unsigned int r_max, unsigned int*  state):
+@cython.boundscheck(False)
+@cython.wraparound(False)   # Deactivate negative indexing.
+@cython.initializedcheck(False)
+@cython.cdivision(True)
+cdef unsigned int nextRandInt(unsigned int r_min, unsigned int r_max, unsigned int*  state):
     """
     Helper function that provides a fast way of getting random integers in a given range.
     r_min is the minimum value of this range
@@ -216,16 +323,26 @@ cdef nextRandInt(unsigned int r_min, unsigned int r_max, unsigned int*  state):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)   # Deactivate negative indexing.
+@cython.initializedcheck(False)
+@cython.cdivision(True)
 def lzjd_fSH(const unsigned char[::1] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
     """
     This method computes the LZJD set using NEW
     """
-    cdef set s1 = computeLZset(input_bytes, hash_size, false_seen_prob, seed)
+    #First, figure out how big we need our hash-set to be to def be good
+    cdef unsigned int _set_len = 0
+    while twinPrimesP2[_set_len]//2 < len(input_bytes):
+        _set_len += 1
+    _set_len = twinPrimesP2[_set_len]
+    #Allocate the set
+    cdef int[:] keys = array.array('i', [0]*_set_len)
+    cdef int[:] status = array.array('i', [FREE]*_set_len)
+    cdef unsigned int setLength = computeLZset(input_bytes, hash_size, false_seen_prob, seed, keys, status)
     
     cdef unsigned int pos = 0
     cdef unsigned int i
     cdef signed int v
-    cdef unsigned int setLength = len(s1)
+    
     
     cdef np.ndarray[float, ndim=1, mode="c"] h = np.full(shape=(hash_size), fill_value=2**32, dtype=np.float32) #use 2^32 instead of inf b/c min() call later will error otherwise
     
@@ -234,9 +351,13 @@ def lzjd_fSH(const unsigned char[::1] input_bytes, unsigned int hash_size, float
     cdef signed int* q = <signed int *>malloc(hash_size * cython.sizeof(int))
     cdef signed int* b = <signed int *>malloc(hash_size * cython.sizeof(int))
     cdef signed int* p = <signed int *>malloc(hash_size * cython.sizeof(int))
-    for v in s1:
-        d[pos] = v
-        pos = pos + 1
+#     for v in s1:
+#         d[pos] = v
+#         pos = pos + 1
+    for i in range(len(status)):
+        if status[i] == OCCUPIED:
+            d[pos] = keys[i]#v
+            pos = pos + 1
         
     for i in range(hash_size):
         q[i] = -1
@@ -285,7 +406,7 @@ def lzjd_fSH(const unsigned char[::1] input_bytes, unsigned int hash_size, float
             p[k] = swap_tmp
             
             if r + j < h[p[j]]:
-                jp = min(floor(h[p[j]]), m-1)
+                jp = <int>fmin(floor(h[p[j]]), (float)(m-1))
                 h[p[j]] = r + j
                 if j < jp:
                     b[jp] -= 1
@@ -304,6 +425,10 @@ def lzjd_fSH(const unsigned char[::1] input_bytes, unsigned int hash_size, float
     return h, setLength
     
 #Wrapper function to call qsort
+@cython.boundscheck(False)
+@cython.wraparound(False)   # Deactivate negative indexing.
+@cython.initializedcheck(False)
+@cython.cdivision(True)
 cdef void sort(signed int* y, ssize_t l):
     qsort(y, l, cython.sizeof(int), compare)
     
@@ -313,21 +438,31 @@ cdef void sort(signed int* y, ssize_t l):
 #right: the right most position of the array (exclusive)
 #k: the rank to get up to
 #NOTE: Normally q_select this naive wouldn't be great. Be we know for fact that we will have random looking values and random distribution b/c all entries are results from hashing. So this should be fine!
-cdef q_select(int* arr, int left, int right, int k):
+@cython.boundscheck(False)
+@cython.wraparound(False)   # Deactivate negative indexing.
+@cython.initializedcheck(False)
+@cython.cdivision(True)
+cdef int q_select(int[:] arr, int left, int right, int k):
+# cdef q_select(int* arr, int left, int right, int k):
     pivotIndex = q_partition(arr, left, right)
     # The pivot is in its final sorted position
     if k == pivotIndex or (right - left) <= 1:
-        return
+        return 0
     elif k < pivotIndex:
-        q_select(arr, left, pivotIndex, k)
+        return q_select(arr, left, pivotIndex, k)
     else:
-        q_select(arr, pivotIndex + 1, right, k)
+        return q_select(arr, pivotIndex + 1, right, k)
 
 #arr: array of elements
 #left: the left most position of the array (inclusive)
 #right: the right most position of the array (exclusive)
 #returns position of the pivot
-cdef int q_partition(int* arr, int left, int right):
+@cython.boundscheck(False)
+@cython.wraparound(False)   # Deactivate negative indexing.
+@cython.initializedcheck(False)
+@cython.cdivision(True)
+cdef int q_partition(int[:] arr, int left, int right):
+# cdef int q_partition(int* arr, int left, int right):
     cdef int pivot = arr[left]
     cdef int temp
     cdef int i = left - 1
@@ -350,14 +485,20 @@ cdef int q_partition(int* arr, int left, int right):
         arr[i] = temp
         
 
-    
+@cython.boundscheck(False)
+@cython.wraparound(False)   # Deactivate negative indexing.
+@cython.initializedcheck(False)
+@cython.cdivision(True)
 cdef int compare(const_void *va, const_void *vb):
     cdef int a = (<signed int *>va)[0]
     cdef int b = (<signed int *>vb)[0]
     return (a > b) - (a < b)
     
+
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
+@cython.initializedcheck(False)
+@cython.cdivision(True)
 def intersection_size(int[::1] A, int[::1] B):
     cdef unsigned int pos_a = 0
     cdef unsigned int pos_b = 0
@@ -379,6 +520,8 @@ def intersection_size(int[::1] A, int[::1] B):
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
+@cython.initializedcheck(False)
+@cython.cdivision(True)
 def k_bit_float2vec(float[::1] A, unsigned int k ):
     """
     This method takes as input an array of floating point values associated with a SuperMinHash.
