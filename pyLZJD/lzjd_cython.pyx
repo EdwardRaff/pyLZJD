@@ -5,14 +5,16 @@ from libc.stdlib cimport malloc, realloc, free
 import numpy as np
 cimport numpy as np
 from math import floor
-from scipy.sparse import csr_matrix 
+from scipy.sparse import csr_matrix
+from cpython cimport set
 
 import time
 
 
 
 
-#We are going to get a warning from cython that looks like 
+
+#We are going to get a warning from cython that looks like
 #warning: "Using deprecated NumPy API, disable it by " "#defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION" [-W#warnings]
 #We can ignore it https://stackoverflow.com/questions/25789055/cython-numpy-warning-about-npy-no-deprecated-api-when-using-memoryview
 
@@ -83,9 +85,9 @@ cdef int MurmurHash_PushByte(char b, unsigned int* cur_len, int* _h1, char* data
     return h1_as_if_done;
 
 @cython.boundscheck(False)
-cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
+cdef computeLZset(const unsigned char[::1] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
     """
-    This method does the lifting to compute the LZ set using the LZJD_f variant of LZJD. 
+    This method does the lifting to compute the LZ set using the LZJD_f variant of LZJD.
     """
     cdef set s1
     s1 = set()
@@ -93,12 +95,14 @@ cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size, fl
     cdef unsigned int cur_length = 0
     cdef char data[4]
     cdef int state = 0
-    cdef int hash 
-    #Defined b as a char to avoid it becoming a python big-num and causing errors 
+    cdef int hash
+    #Defined b as a char to avoid it becoming a python big-num and causing errors
     cdef unsigned char b
     
     cdef unsigned int prng_state = 0
     cdef unsigned int fast_fs_check = 4294967295 #Used if we have a false-seen prob > 0. Default is max integer value
+    cdef unsigned int i = 0
+    cdef unsigned char* raw_input = &input_bytes[0]
     
     #Check if we should apply over-sampling technique from "Malware Classification and Class Imbalance via Stochastic Hashed LZJD"
     if false_seen_prob > 0 and false_seen_prob < 1.0:
@@ -108,7 +112,8 @@ cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size, fl
         fast_fs_check = int((1-false_seen_prob)*fast_fs_check)
         
         #SHWEL style hashing
-        for b in input_bytes:
+        for i in range(len(input_bytes)):
+            b = raw_input[i]
             hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
             
             if not hash in s1 and xorshift32(&prng_state) < fast_fs_check :
@@ -120,7 +125,8 @@ cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size, fl
         
     else:
         #Normal run
-        for b in input_bytes:
+        for i in range(len(input_bytes)):
+            b = raw_input[i]
             hash = MurmurHash_PushByte(<char>b, &cur_length, &state, data)
             if not hash in s1:
                 s1.add(hash)
@@ -131,10 +137,10 @@ cdef computeLZset(const unsigned char[:] input_bytes, unsigned int hash_size, fl
     return s1
     
 @cython.boundscheck(False)
-def lzjd_f(const unsigned char[:] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
+def lzjd_f(const unsigned char[::1] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
     """
-    This method computes the LZJD set using the original paper's approach. 
-    We find the LZJD_f set, and find the k small hash values (k=hash_size). 
+    This method computes the LZJD set using the original paper's approach.
+    We find the LZJD_f set, and find the k small hash values (k=hash_size).
     We then return that list as the LZJD digest
     """
     cdef set s1 = computeLZset(input_bytes, hash_size, false_seen_prob, seed)
@@ -191,10 +197,10 @@ cdef xorshift32(unsigned int*  state):
 
 cdef nextRandInt(unsigned int r_min, unsigned int r_max, unsigned int*  state):
     """
-    Helper function that provides a fast way of getting random integers in a given range. 
+    Helper function that provides a fast way of getting random integers in a given range.
     r_min is the minimum value of this range
-    r_max is the maximum value of this range. 
-    state is a pointer to the state of the PRNG, and will be modified using xorshift32. 
+    r_max is the maximum value of this range.
+    state is a pointer to the state of the PRNG, and will be modified using xorshift32.
     """
     cdef unsigned long k_tmp
     cdef unsigned int k
@@ -210,7 +216,7 @@ cdef nextRandInt(unsigned int r_min, unsigned int r_max, unsigned int*  state):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)   # Deactivate negative indexing.
-def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
+def lzjd_fSH(const unsigned char[::1] input_bytes, unsigned int hash_size, float false_seen_prob, unsigned int seed):
     """
     This method computes the LZJD set using NEW
     """
@@ -246,7 +252,7 @@ def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size, float f
     
     cdef unsigned int r_int
     cdef unsigned int k
-    cdef unsigned int swap_tmp 
+    cdef unsigned int swap_tmp
     cdef float r
     cdef unsigned int jp
     
@@ -256,10 +262,11 @@ def lzjd_fSH(const unsigned char[:] input_bytes, unsigned int hash_size, float f
         PRNG_state = max(1, d[i])
         j = 0
         while j <= a:
-            #r ← uniform random number from [0, 1) 
+            #r ← uniform random number from [0, 1)
             r_int = xorshift32(&PRNG_state)
             r_int >>= 9 # We only want 24 bits of randomness, b/c we need to divide by a value that will fit well as a float
-            r = r_int / float(1 << 24)
+            #r = r_int / float(1 << 24)
+            r = r_int / 16777216.0 #typing the float out to avoid Cython/python overhead weirdness
             #k ← uniform random number from {j, . . . ,m − 1}
             k = nextRandInt(j, m-1, &PRNG_state)
             
@@ -304,7 +311,7 @@ cdef void sort(signed int* y, ssize_t l):
 #arr: array of elements
 #left: the left most position of the array (inclusive)
 #right: the right most position of the array (exclusive)
-#k: the rank to get up to 
+#k: the rank to get up to
 #NOTE: Normally q_select this naive wouldn't be great. Be we know for fact that we will have random looking values and random distribution b/c all entries are results from hashing. So this should be fine!
 cdef q_select(int* arr, int left, int right, int k):
     pivotIndex = q_partition(arr, left, right)
@@ -322,15 +329,15 @@ cdef q_select(int* arr, int left, int right, int k):
 #returns position of the pivot
 cdef int q_partition(int* arr, int left, int right):
     cdef int pivot = arr[left]
-    cdef int temp 
+    cdef int temp
     cdef int i = left - 1
     cdef int j = right
     while True:
-        #Find leftmost element greater than or equal to pivot 
+        #Find leftmost element greater than or equal to pivot
         i = i + 1
         while arr[i] < pivot:
             i = i + 1
-        #Find rightmost element smaller than  or equal to pivot 
+        #Find rightmost element smaller than  or equal to pivot
         j = j - 1
         while arr[j] > pivot:
             j = j - 1
@@ -374,18 +381,18 @@ def intersection_size(int[::1] A, int[::1] B):
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
 def k_bit_float2vec(float[::1] A, unsigned int k ):
     """
-    This method takes as input an array of floating point values associated with a SuperMinHash. 
-    To apply the k-bit approach of converting a min-hash to a feature vector from 
+    This method takes as input an array of floating point values associated with a SuperMinHash.
+    To apply the k-bit approach of converting a min-hash to a feature vector from
     "Hashing Algorithms for Large-Scale Learning", we need to access the integer representation of
-    the data. 
+    the data.
     
-    This method does that work, and returns a feature vector of the appropriate size. 
+    This method does that work, and returns a feature vector of the appropriate size.
     -- A is the input min-hash
     -- k is the number of bits to use in converting it to a feature vector
     """
     
     cdef unsigned int out_size = A.shape[0] * (1<<k)
-    cdef unsigned int mask = (1<<k)-1 # This is the bit mask to apply to features. 
+    cdef unsigned int mask = (1<<k)-1 # This is the bit mask to apply to features.
     
     #Dont use np array, dense wastes too much memory
     #cdef np.ndarray[float, ndim=1, mode="c"] h = np.zeros(shape=(out_size), dtype=np.float32)
@@ -396,7 +403,7 @@ def k_bit_float2vec(float[::1] A, unsigned int k ):
     cdef np.ndarray[int, ndim=1, mode="c"] row_ind = np.full(shape=(A.shape[0]), fill_value=0, dtype=np.int32)
     cdef np.ndarray[int, ndim=1, mode="c"] col_ind = np.zeros(shape=(A.shape[0]), dtype=np.int32)
     
-    cdef unsigned int i 
+    cdef unsigned int i
     cdef unsigned int raw_bytes
     cdef unsigned int pos
     
@@ -406,7 +413,7 @@ def k_bit_float2vec(float[::1] A, unsigned int k ):
     for i in range(A.shape[0]):
         #raw_bytes = raw_data[i]
         raw_bytes = (<unsigned int*>&(A[i]))[0]
-        #Lets apply some iters of XORshift to get better distribution, b/c we might get weirdness with layout of bits in floats for mantisa and exponent 
+        #Lets apply some iters of XORshift to get better distribution, b/c we might get weirdness with layout of bits in floats for mantisa and exponent
         xorshift32(&raw_bytes)
         xorshift32(&raw_bytes)
         pos = (1<<k)*i
