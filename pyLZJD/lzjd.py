@@ -41,7 +41,7 @@ def digest(b, hash_size=1024, mode=None, processes=-1, false_seen_prob=0.0, seed
         raise ValueError('Input was not a byte array, or could not be converted to one.')
 
     if seed is None:
-        seed = int(time.monotonic()*1000)
+        seed = int(time.monotonic()*1000 % 4294967295)
 
     if mode == "SuperHash" or mode == "sh":
         return lzjd_cython.lzjd_fSH(b, hash_size, false_seen_prob, seed)
