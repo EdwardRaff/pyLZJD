@@ -1,6 +1,6 @@
 # pyLZJD
 
-pyLZJD is a Python implementatio of the *Lempel-Ziv Jaccard Distance*, a distance metric designed for arbitrary byte sequences, and originally used for malware classification. It was inspired by and developed as an alternative to 
+pyLZJD is a Python implementation of the *Lempel-Ziv Jaccard Distance*, a distance metric designed for arbitrary byte sequences, and originally used for malware classification. It was inspired by and developed as an alternative to 
 the 
 [Normalized Compression Distance](https://en.wikipedia.org/wiki/Normalized_compression_distance). But, we've also found it useful for similarity digest taks, where one would normaly use either 
 [ssdeep](http://www.forensicswiki.org/wiki/Ssdeep) or [sdhash](http://roussev.net/sdhash/tutorial/03-quick.html). 
