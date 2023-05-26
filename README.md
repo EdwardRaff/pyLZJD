@@ -2,21 +2,21 @@
 
 pyLZJD is a Python implementation of the *Lempel-Ziv Jaccard Distance*, a distance metric designed for arbitrary byte sequences, and originally used for malware classification. It was inspired by and developed as an alternative to 
 the 
-[Normalized Compression Distance](https://en.wikipedia.org/wiki/Normalized_compression_distance). But, we've also found it useful for similarity digest taks, where one would normaly use either 
+[Normalized Compression Distance](https://en.wikipedia.org/wiki/Normalized_compression_distance). But, we've also found it useful for similarity digest taks, where one would normally use either 
 [ssdeep](http://www.forensicswiki.org/wiki/Ssdeep) or [sdhash](http://roussev.net/sdhash/tutorial/03-quick.html). 
 
 ## Why use pyLZJD? 
 
 If you need to find similar byte sequences, and your byte sequences can be long (>500kb), then you should consider using LZJD and this implementation! LZJD is fast, efficient, and we've found it to be more accurate than the 
-previously existing options. If you want to know more nity gritty details, check out the two papers listed under citations. 
+previously existing options. If you want to know more nitty gritty details, check out the two papers listed under citations. 
 
-We currently recommend the pyLZJD implementation for ptototyipng and learning / experimenting with the LZJD algorithm. This code is not yet production ready, and better and faster implementations exist.
+We currently recommend the pyLZJD implementation for prototyping and learning / experimenting with the LZJD algorithm. This code is not yet production ready, and better and faster implementations exist.
 
 ## Why not use pyLZJD?
 
 There currently exists the original [Java implementation](https://github.com/EdwardRaff/jLZJD) and a [C++ implementation](https://github.com/EdwardRaff/LZJD) of the LZJD algorithm. While we have implemented the main portion in Cython, this version is currently 3-20 times slower than these more optimized implementations. If you need efficiency or plan to report timing numbers, please do not use this version. 
 
-# Insallation 
+# Installation 
 
 To install pyLZJD, you can currently use this syntax with pip:
 ```
@@ -31,7 +31,7 @@ python setup.py install
 ## Citations
 
 If you use LZJD, please cite it! There are currently two papers related to LZJD. The [original paper](http://www.edwardraff.com/publications/alternative-ncd-lzjd.pdf) that introduces it, and a [followup paper](https://arxiv.org/abs/1708.03346) that shows how LZJD 
-can be used inplace of ssdeep and sdhash, and makes LZJD even faster. Please cite the first paper if you use LZJD at all, and please cite the second as well if you use this implementation as it uses the faster version introduced in 
+can be used in place of ssdeep and sdhash, and makes LZJD even faster. Please cite the first paper if you use LZJD at all, and please cite the second as well if you use this implementation as it uses the faster version introduced in 
 the second paper. 
 
 ```
