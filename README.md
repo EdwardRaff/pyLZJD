@@ -10,7 +10,7 @@ the
 If you need to find similar byte sequences, and your byte sequences can be long (>500kb), then you should consider using LZJD and this implementation! LZJD is fast, efficient, and we've found it to be more accurate than the 
 previously existing options. If you want to know more nitty gritty details, check out the two papers listed under citations. 
 
-We currently recommend the pyLZJD implementation for prototyipng and learning / experimenting with the LZJD algorithm. This code is not yet production ready, and better and faster implementations exist.
+We currently recommend the pyLZJD implementation for prototyping and learning / experimenting with the LZJD algorithm. This code is not yet production ready, and better and faster implementations exist.
 
 ## Why not use pyLZJD?
 
