@@ -489,7 +489,7 @@ cdef int q_partition(int[:] arr, int left, int right):
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.initializedcheck(False)
 @cython.cdivision(True)
-cdef int compare(const_void *va, const_void *vb):
+cdef int compare(const_void *va, const_void *vb) noexcept:
     cdef int a = (<signed int *>va)[0]
     cdef int b = (<signed int *>vb)[0]
     return (a > b) - (a < b)
