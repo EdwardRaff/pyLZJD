@@ -67,9 +67,9 @@ def sim(A, B):
     #What if the hashes are different sizes? Math works out that we can take the min length
     #Reduces as back to same size hashes, and its as if we only computed the min-hashing to
     #*just* as many hashes as there were members
-    min_len = min(A.shape[0], B.shape[0])
-    
-    return intersection_size/float(2*min_len - intersection_size)
+    total_size = A.shape[0] + B.shape[0] - intersection_size
+
+    return intersection_size/float(total_size)
 
 def vectorize(b, hash_size=1024, k=8, processes=-1, false_seen_prob=0.0, seed=None):
     if isinstance(b, list): #Assume this is a list of things to hash. 
